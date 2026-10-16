@@ -126,19 +126,35 @@ uint32_t compH(int32_t adc) {
 bool bmeRead(int16_t &t100, uint16_t &rh100, uint16_t &p10) {
   wr(0xF2, 0x01);
   wr(0xF4, 0x25);
-  uint8_t st; uint32_t t0 = millis();
-  do { delay(2); rd(0xF3, &st, 1); } while ((st & 0x08) && millis() - t0 < 100);
+  uint8_t st = 0; uint32_t t0 = millis();
+  do {
+    delay(2);
+    if (!rd(0xF3, &st, 1)) return false;
+  } while ((st & 0x08) && millis() - t0 < 100);
+  if (st & 0x08) return false;               // misura non conclusa: dati vecchi
 
   uint8_t d[8];
   if (!rd(0xF7, d, 8)) return false;
   int32_t adcP = (d[0] << 12) | (d[1] << 4) | (d[2] >> 4);
   int32_t adcT = (d[3] << 12) | (d[4] << 4) | (d[5] >> 4);
   int32_t adcH = (d[6] << 8) | d[7];
+  // Valori di reset dei registri: il sensore si è riavviato e non ha misurato
+  if (adcT == 0x80000 || adcP == 0x80000 || adcH == 0x8000) return false;
 
   t100  = (int16_t)compT(adcT);
   p10   = (uint16_t)(compP(adcP) / 2560);
   rh100 = (uint16_t)((compH(adcH) * 100) >> 10);
   return true;
+}
+
+// Se la lettura fallisce il sensore viene reinizializzato (indirizzo, chip ID,
+// calibrazione) e riletto subito, così un errore transitorio non costa un ciclo.
+// Se non risponde ancora, ci si riprova al ciclo successivo.
+bool sensorRead(int16_t &t100, uint16_t &rh100, uint16_t &p10) {
+  if (addr && bmeRead(t100, rh100, p10)) return true;
+  if (addr) DBG("BME280: lettura fallita, reinizializzo\r\n");
+  addr = 0;
+  return bmeInit() && bmeRead(t100, rh100, p10);
 }
 
 // ---------- Autodiagnosi ----------
@@ -199,7 +215,7 @@ void setup() {
 
 void loop() {
   int16_t t; uint16_t rh, p;
-  if ((addr || bmeInit()) && bmeRead(t, rh, p)) {
+  if (sensorRead(t, rh, p)) {
     uint16_t vbat = (uint16_t)(api.system.bat.get() * 1000);
     uint8_t pl[10] = {
       NODE_ID, seq++,

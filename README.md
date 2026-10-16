@@ -21,7 +21,8 @@ nodo SHT45 (ID 1)* ──┴─────────────────�
 | bridge Python | legge il CSV dal ricevitore sul Raspberry | da scrivere |
 
 Ogni sketch sta in una cartella con lo stesso nome del file `.ino`, come richiede
-l'IDE Arduino. Si compilano con il pacchetto di schede RAKwireless RUI3.
+l'IDE Arduino. Si compilano con il pacchetto di schede RAKwireless RUI3
+(verificati con la versione 4.3.0, scheda *WisDuo RAK3172 Evaluation Board*).
 
 ## Parametri radio
 
@@ -80,7 +81,15 @@ l'indirizzo (a GND = `0x76`, a 3V3 = `0x77`). Lo sketch li prova entrambi e
 riconosce un BMP280 montato per errore (niente umidità).
 
 Il sensore è letto in *forced mode*, una misura per ciclo, poi il modulo va in
-sleep. Configurazione in testa allo sketch:
+sleep.
+
+Una lettura è scartata se il sensore non risponde sull'I2C, se la misura non
+termina entro 100 ms o se i registri contengono ancora i valori di reset (il
+sensore si è riavviato, per esempio per un falso contatto sull'alimentazione).
+In questi casi il nodo reinizializza il sensore e lo rilegge subito; se non
+risponde ancora non trasmette nulla e ci riprova al ciclo successivo.
+
+Configurazione in testa allo sketch:
 
 | Costante | Prova | Esercizio |
 |---|---|---|
@@ -127,5 +136,6 @@ I pacchetti persi si ricavano dai salti del contatore, che riparte da 0 dopo 255
 |---|---|
 | **Tensione misurata** | `api.system.bat.get()` sul RAK3172 dovrebbe misurare l'alimentazione del modulo, non della batteria: con un regolatore in mezzo leggerebbe sempre ~3,3 V. Da verificare |
 | **Soglia di tensione alta** | `VBAT_MAX_MV` è 3700, ma il modulo accetta al massimo 3600 mV |
-| **Sensore perso** | se il BME280 smette di rispondere dopo l'avvio, il nodo non ritenta l'inizializzazione |
+| **Sensore guasto non segnalato** | se il BME280 non risponde il nodo non trasmette: dal ricevitore un sensore guasto e un nodo spento sono indistinguibili |
+| **Bus I2C bloccato** | se il sensore resta a metà di una trasmissione e tiene SDA basso, la reinizializzazione non basta: servirebbe la procedura di sblocco del bus (impulsi su SCL) |
 | **Mittenti non filtrati** | il ricevitore accetta qualsiasi pacchetto di 8 o 10 byte; gli ID noti vanno filtrati nel ricevitore o nel bridge |
