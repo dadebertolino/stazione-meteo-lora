@@ -7,7 +7,9 @@
  * (devono essere IDENTICI a quelli dei nodi).
  *
  * Uscita CSV: id,seq,temp_C,ur_pct,press_hPa,vbat_mV,rssi,snr
- * Tutte le altre righe iniziano con '#' così il bridge le ignora.
+ * I valori "non disponibile" (T = 0x8000, UR o P = 0xFFFF: sensore che non
+ * risponde) escono come campi vuoti. Tutte le altre righe iniziano con '#'
+ * così il bridge le ignora.
  */
 
 // ---------- Configurazione (uguale ai nodi) ----------
@@ -18,6 +20,10 @@
 #define P2P_PL    8
 #define P2P_TXP   14
 // -----------------------------------------------------
+
+// Valori "non disponibile" nel payload (uguali ai nodi)
+#define ND_I16    ((int16_t)0x8000)
+#define ND_U16    0xFFFF
 
 uint8_t errors = 0, fixes = 0;
 uint32_t rxCount = 0, rxBad = 0;
@@ -45,17 +51,25 @@ void recvCallback(rui_lora_p2p_recv_t data) {
   uint8_t  seq = b[1];
   int16_t  t   = (int16_t)((b[2] << 8) | b[3]);
   uint16_t rh  = (b[4] << 8) | b[5];
-
+  uint16_t p   = ND_U16;                         // SHT45: niente pressione
+  uint16_t vbat;
   if (n == 8) {                                  // SHT45
-    uint16_t vbat = (b[6] << 8) | b[7];
-    Serial.printf("%u,%u,%.2f,%.2f,,%u,%d,%d\r\n",
-                  id, seq, t / 100.0f, rh / 100.0f, vbat, data.Rssi, data.Snr);
+    vbat = (b[6] << 8) | b[7];
   } else {                                       // BME280
-    uint16_t p    = (b[6] << 8) | b[7];
-    uint16_t vbat = (b[8] << 8) | b[9];
-    Serial.printf("%u,%u,%.2f,%.2f,%.1f,%u,%d,%d\r\n",
-                  id, seq, t / 100.0f, rh / 100.0f, p / 10.0f, vbat, data.Rssi, data.Snr);
+    p    = (b[6] << 8) | b[7];
+    vbat = (b[8] << 8) | b[9];
   }
+
+  // Campi vuoti per i valori non disponibili
+  char sT[10] = "", sRh[10] = "", sP[10] = "";
+  if (t  != ND_I16) snprintf(sT,  sizeof(sT),  "%.2f", t / 100.0f);
+  if (rh != ND_U16) snprintf(sRh, sizeof(sRh), "%.2f", rh / 100.0f);
+  if (p  != ND_U16) snprintf(sP,  sizeof(sP),  "%.1f", p / 10.0f);
+
+  if (t == ND_I16 && rh == ND_U16)
+    Serial.printf("# nodo %u: il sensore non risponde\r\n", id);
+  Serial.printf("%u,%u,%s,%s,%s,%u,%d,%d\r\n",
+                id, seq, sT, sRh, sP, vbat, data.Rssi, data.Snr);
 }
 
 void selfTest() {

@@ -87,7 +87,10 @@ Una lettura è scartata se il sensore non risponde sull'I2C, se la misura non
 termina entro 100 ms o se i registri contengono ancora i valori di reset (il
 sensore si è riavviato, per esempio per un falso contatto sull'alimentazione).
 In questi casi il nodo reinizializza il sensore e lo rilegge subito; se non
-risponde ancora non trasmette nulla e ci riprova al ciclo successivo.
+risponde ancora trasmette comunque il pacchetto, con le misure **non
+disponibili** e la tensione (vedi [Formato dei pacchetti](#formato-dei-pacchetti)),
+e ci riprova al ciclo successivo. Così il ricevitore distingue un sensore
+guasto (pacchetti senza misure) da un nodo spento (nessun pacchetto).
 
 Configurazione in testa allo sketch:
 
@@ -114,6 +117,20 @@ Interi **big endian**. Il ricevitore distingue il tipo di nodo dalla lunghezza.
 
 La pressione è quella **misurata sul posto**, non riportata al livello del mare.
 
+Valori riservati per **misura non disponibile** (sensore che non risponde),
+scelti fuori da qualsiasi misura reale:
+
+| Campo | Valore riservato | Come apparirebbe se decodificato come misura |
+|---|---|---|
+| temperatura | `0x8000` | −327,68 °C |
+| umidità | `0xFFFF` | 655,35 % |
+| pressione | `0xFFFF` | 6553,5 hPa |
+
+La lunghezza del pacchetto non cambia, quindi il tipo di nodo resta riconoscibile.
+Il futuro nodo SHT45 deve usare la stessa convenzione. Nodo e ricevitore vanno
+aggiornati insieme: un ricevitore precedente stamperebbe i valori della terza
+colonna come se fossero misure.
+
 ## Uscita del ricevitore
 
 Seriale a 115200 baud, una riga per pacchetto valido (valori di esempio):
@@ -123,9 +140,17 @@ id,seq,temp_C,ur_pct,press_hPa,vbat_mV,rssi,snr
 2,17,18.43,61.20,965.3,3291,-72,9
 ```
 
-Per i nodi SHT45 il campo `press_hPa` resta vuoto. Tutte le altre righe
-(autodiagnosi, statistiche, pacchetti scartati) iniziano con `#` e il bridge le
-deve ignorare. Ogni 10 minuti il ricevitore stampa il conteggio dei pacchetti
+Le misure non disponibili escono come **campi vuoti**; per i nodi SHT45
+`press_hPa` è sempre vuoto. Un pacchetto con temperatura e umidità vuote viene
+da un nodo acceso con il sensore guasto:
+
+```
+# nodo 2: il sensore non risponde
+2,18,,,,3290,-71,9
+```
+
+Tutte le altre righe (autodiagnosi, statistiche, pacchetti scartati, avvisi
+come quello sopra) iniziano con `#` e il bridge le deve ignorare. Ogni 10 minuti il ricevitore stampa il conteggio dei pacchetti
 validi e scartati e riavvia la ricezione.
 
 I pacchetti persi si ricavano dai salti del contatore, che riparte da 0 dopo 255.
@@ -136,6 +161,6 @@ I pacchetti persi si ricavano dai salti del contatore, che riparte da 0 dopo 255
 |---|---|
 | **Tensione misurata** | `api.system.bat.get()` sul RAK3172 dovrebbe misurare l'alimentazione del modulo, non della batteria: con un regolatore in mezzo leggerebbe sempre ~3,3 V. Da verificare |
 | **Soglia di tensione alta** | `VBAT_MAX_MV` è 3700, ma il modulo accetta al massimo 3600 mV |
-| **Sensore guasto non segnalato** | se il BME280 non risponde il nodo non trasmette: dal ricevitore un sensore guasto e un nodo spento sono indistinguibili |
+| **Macro `DEBUG`** | il pacchetto RUI3 definisce già `DEBUG` a 1 (`-DDEBUG`): con `DEBUG 0` lo sketch funziona ma il compilatore segnala la ridefinizione. Un nome proprio (es. `NODE_DEBUG`) eliminerebbe l'avviso |
 | **Bus I2C bloccato** | se il sensore resta a metà di una trasmissione e tiene SDA basso, la reinizializzazione non basta: servirebbe la procedura di sblocco del bus (impulsi su SCL) |
 | **Mittenti non filtrati** | il ricevitore accetta qualsiasi pacchetto di 8 o 10 byte; gli ID noti vanno filtrati nel ricevitore o nel bridge |

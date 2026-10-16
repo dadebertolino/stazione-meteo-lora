@@ -8,6 +8,9 @@
  *
  * Payload (10 byte, big endian):
  *   [0] ID  [1] contatore  [2-3] T x100 (int16)  [4-5] UR x100  [6-7] P hPa x10  [8-9] Vbat mV
+ * Se il sensore non risponde il pacchetto parte lo stesso, con T = 0x8000 e
+ * UR = P = 0xFFFF ("non disponibile"): il ricevitore distingue così un sensore
+ * guasto da un nodo spento.
  */
 
 #include <Wire.h>
@@ -28,10 +31,14 @@
 #define VBAT_MAX_MV  3700
 // ------------------------------------
 
+// Valori "non disponibile" nel payload: fuori da qualsiasi misura reale
+#define ND_I16       ((int16_t)0x8000)
+#define ND_U16       0xFFFF
+
 #if DEBUG
   #define DBG(...) Serial.printf(__VA_ARGS__)
 #else
-  #define DBG(...)
+  #define DBG(...) do {} while (0)
 #endif
 
 uint8_t addr = 0;
@@ -215,28 +222,28 @@ void setup() {
 
 void loop() {
   int16_t t; uint16_t rh, p;
-  if (sensorRead(t, rh, p)) {
-    uint16_t vbat = (uint16_t)(api.system.bat.get() * 1000);
-    uint8_t pl[10] = {
-      NODE_ID, seq++,
-      (uint8_t)(t >> 8), (uint8_t)t,
-      (uint8_t)(rh >> 8), (uint8_t)rh,
-      (uint8_t)(p >> 8), (uint8_t)p,
-      (uint8_t)(vbat >> 8), (uint8_t)vbat
-    };
-    DBG("T=%.2f C  UR=%.2f %%  P=%.1f hPa  Vbat=%u mV  seq=%u  ",
-        t / 100.0f, rh / 100.0f, p / 10.0f, vbat, pl[1]);
+  bool ok = sensorRead(t, rh, p);
+  if (!ok) { t = ND_I16; rh = ND_U16; p = ND_U16; }
 
-    txDone = false;
-    if (api.lora.psend(sizeof(pl), pl)) {
-      uint32_t t0 = millis();
-      while (!txDone && millis() - t0 < 3000) delay(10);
-      DBG(txDone ? "TX ok\r\n" : "TX timeout\r\n");
-    } else {
-      DBG("ERRORE psend\r\n");
-    }
+  uint16_t vbat = (uint16_t)(api.system.bat.get() * 1000);
+  uint8_t pl[10] = {
+    NODE_ID, seq++,
+    (uint8_t)(t >> 8), (uint8_t)t,
+    (uint8_t)(rh >> 8), (uint8_t)rh,
+    (uint8_t)(p >> 8), (uint8_t)p,
+    (uint8_t)(vbat >> 8), (uint8_t)vbat
+  };
+  if (ok) DBG("T=%.2f C  UR=%.2f %%  P=%.1f hPa  ", t / 100.0f, rh / 100.0f, p / 10.0f);
+  else    DBG("BME280 NON RISPONDE  ");
+  DBG("Vbat=%u mV  seq=%u  ", vbat, pl[1]);
+
+  txDone = false;
+  if (api.lora.psend(sizeof(pl), pl)) {
+    uint32_t t0 = millis();
+    while (!txDone && millis() - t0 < 3000) delay(10);
+    DBG(txDone ? "TX ok\r\n" : "TX timeout\r\n");
   } else {
-    DBG("ERRORE lettura BME280\r\n");
+    DBG("ERRORE psend\r\n");
   }
   api.system.sleep.all(INTERVAL_MS);
 }
