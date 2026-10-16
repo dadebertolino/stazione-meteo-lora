@@ -17,7 +17,7 @@
 #define INTERVAL_MS  30000UL       // 30 s test; in esercizio 600000UL (10 min)
 #define DEBUG        1             // 0 = nessuna stampa (installazione definitiva)
 
-#define P2P_FREQ     868000000UL
+#define P2P_FREQ     868100000UL   // 868,1 MHz: con BW 125 kHz resta tutta in 868,0-868,6 (duty cycle 1 %)
 #define P2P_SF       7
 #define P2P_BW       125
 #define P2P_CR       0             // 0 = 4/5

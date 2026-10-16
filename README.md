@@ -31,12 +31,38 @@ confronta i parametri salvati in flash e corregge quelli diversi.
 
 | Parametro | Valore |
 |---|---|
-| Frequenza | 868,000 MHz |
+| Frequenza | 868,100 MHz |
 | Spreading factor | SF7 |
 | Banda | 125 kHz |
 | Coding rate | 4/5 |
 | Preambolo | 8 simboli |
 | Potenza | 14 dBm |
+
+### Limiti di banda
+
+Con banda 125 kHz centrata su 868,1 MHz il segnale occupa 868,0375-868,1625 MHz,
+tutto dentro la sottobanda **868,0-868,6 MHz** (ERC/REC 70-03), che ammette
+**25 mW ERP** e **duty cycle 1 %**: al massimo 36 s di trasmissione per ora.
+
+Un pacchetto di 8 o 10 byte a SF7 dura circa 36 ms, quindi:
+
+| Intervallo | Duty cycle |
+|---|---|
+| 30 s (prova) | ~0,12 % |
+| 10 min (esercizio) | ~0,006 % |
+
+Fino all'ottobre 2026 la frequenza era 868,000 MHz: metà del segnale cadeva sotto
+868,0 MHz, in una banda con duty cycle 0,1 %, superato con l'intervallo di prova.
+
+I 14 dBm sono misurati all'uscita del modulo; il limite di 25 mW è riferito
+alla potenza irradiata (ERP) e quindi include il guadagno dell'antenna. Con
+un'antenna a stilo o a dipolo si resta nel limite; con un'antenna di guadagno
+superiore a ~2 dBi la potenza va ridotta di conseguenza.
+
+868,1 MHz è anche il primo canale di LoRaWAN. Se nella zona ci sono dispositivi
+LoRaWAN possono esserci collisioni, visibili come salti nel contatore; eventuali
+pacchetti estranei di 8 o 10 byte che il ricevitore dovesse decodificare vanno
+filtrati per ID (vedi [Punti aperti](#punti-aperti)).
 
 ## Nodo BME280
 
@@ -99,7 +125,6 @@ I pacchetti persi si ricavano dai salti del contatore, che riparte da 0 dopo 255
 
 | Questione | Dettaglio |
 |---|---|
-| **Frequenza** | a 868,000 MHz con banda 125 kHz il segnale sconfina sotto 868,0 MHz, dove il duty cycle massimo è 0,1 %. Con invii ogni 10 minuti si resta ampiamente sotto; 868,1 MHz eviterebbe il problema in ogni caso |
 | **Tensione misurata** | `api.system.bat.get()` sul RAK3172 dovrebbe misurare l'alimentazione del modulo, non della batteria: con un regolatore in mezzo leggerebbe sempre ~3,3 V. Da verificare |
 | **Soglia di tensione alta** | `VBAT_MAX_MV` è 3700, ma il modulo accetta al massimo 3600 mV |
 | **Sensore perso** | se il BME280 smette di rispondere dopo l'avvio, il nodo non ritenta l'inizializzazione |

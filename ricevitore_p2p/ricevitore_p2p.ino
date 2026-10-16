@@ -11,7 +11,7 @@
  */
 
 // ---------- Configurazione (uguale ai nodi) ----------
-#define P2P_FREQ  868000000UL
+#define P2P_FREQ  868100000UL
 #define P2P_SF    7
 #define P2P_BW    125
 #define P2P_CR    0
