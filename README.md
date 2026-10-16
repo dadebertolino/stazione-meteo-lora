@@ -102,6 +102,16 @@ Configurazione in testa allo sketch:
 Cambiare l'intervallo non richiede modifiche al ricevitore, che ascolta in
 continuo.
 
+All'avvio l'autodiagnosi confronta la tensione di alimentazione con due soglie e
+segnala un errore se ne è fuori:
+
+| Costante | Valore | Significato |
+|---|---|---|
+| `VBAT_MIN_MV` | 2800 mV | alimentazione bassa; il modulo funziona fino a 2000 mV |
+| `VBAT_MAX_MV` | 3600 mV | massimo di alimentazione del RAK3172 (2,0-3,6 V): sopra si rischia di danneggiarlo |
+
+Il controllo è solo segnalato su seriale e non blocca il nodo.
+
 ## Formato dei pacchetti
 
 Interi **big endian**. Il ricevitore distingue il tipo di nodo dalla lunghezza.
@@ -160,7 +170,6 @@ I pacchetti persi si ricavano dai salti del contatore, che riparte da 0 dopo 255
 | Questione | Dettaglio |
 |---|---|
 | **Tensione misurata** | `api.system.bat.get()` sul RAK3172 dovrebbe misurare l'alimentazione del modulo, non della batteria: con un regolatore in mezzo leggerebbe sempre ~3,3 V. Da verificare |
-| **Soglia di tensione alta** | `VBAT_MAX_MV` è 3700, ma il modulo accetta al massimo 3600 mV |
 | **Macro `DEBUG`** | il pacchetto RUI3 definisce già `DEBUG` a 1 (`-DDEBUG`): con `DEBUG 0` lo sketch funziona ma il compilatore segnala la ridefinizione. Un nome proprio (es. `NODE_DEBUG`) eliminerebbe l'avviso |
 | **Bus I2C bloccato** | se il sensore resta a metà di una trasmissione e tiene SDA basso, la reinizializzazione non basta: servirebbe la procedura di sblocco del bus (impulsi su SCL) |
 | **Mittenti non filtrati** | il ricevitore accetta qualsiasi pacchetto di 8 o 10 byte; gli ID noti vanno filtrati nel ricevitore o nel bridge |

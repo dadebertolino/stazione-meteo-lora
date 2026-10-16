@@ -27,8 +27,8 @@
 #define P2P_PL       8
 #define P2P_TXP      14
 
-#define VBAT_MIN_MV  2800
-#define VBAT_MAX_MV  3700
+#define VBAT_MIN_MV  2800          // sotto: alimentazione bassa (il modulo funziona fino a 2000)
+#define VBAT_MAX_MV  3600          // massimo di alimentazione del RAK3172 (2,0-3,6 V)
 // ------------------------------------
 
 // Valori "non disponibile" nel payload: fuori da qualsiasi misura reale
@@ -204,7 +204,7 @@ void selfTest() {
   DBG("[Alimentazione]\r\n");
   uint16_t vbat = (uint16_t)(api.system.bat.get() * 1000);
   if (vbat < VBAT_MIN_MV)      { DBG("  Vbat %u mV BASSA\r\n", vbat); errors++; }
-  else if (vbat > VBAT_MAX_MV) { DBG("  Vbat %u mV ALTA (max modulo 3600 mV)\r\n", vbat); errors++; }
+  else if (vbat > VBAT_MAX_MV) { DBG("  Vbat %u mV ALTA (max modulo %u mV)\r\n", vbat, VBAT_MAX_MV); errors++; }
   else                           DBG("  Vbat %u mV OK\r\n", vbat);
 
   DBG("=== Esito: %u errori, %u correzioni. Intervallo %lu s ===\r\n\r\n",
