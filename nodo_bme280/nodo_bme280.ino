@@ -3,22 +3,31 @@
  * Con autodiagnosi all'avvio: controlla e corregge modalità radio e parametri P2P,
  * verifica sensore e alimentazione.
  *
+ * Alimentazione: 2 stilo AA alcaline collegate direttamente al pin 3V3 del modulo
+ * (2,0-3,6 V), senza regolatore: api.system.bat.get() misura così le batterie.
+ *
  * Collegamenti: VCC->3V3, GND->GND, SDA->PA11, SCL->PA12
  * (moduli a 6 pin: CSB a 3V3 per I2C, SDO a GND = 0x76, a 3V3 = 0x77)
  *
- * Payload (10 byte, big endian):
- *   [0] ID  [1] contatore  [2-3] T x100 (int16)  [4-5] UR x100  [6-7] P hPa x10  [8-9] Vbat mV
- * Se il sensore non risponde il pacchetto parte lo stesso, con T = 0x8000 e
- * UR = P = 0xFFFF ("non disponibile"): il ricevitore distingue così un sensore
- * guasto da un nodo spento.
+ * Pacchetto, formato v1 (15 byte, big endian):
+ *   [0]     versione formato (4 bit alti) | ID nodo (4 bit bassi, 1-15)
+ *   [1]     contatore: 0 = primo pacchetto dopo un riavvio, poi 1…255, 1…
+ *   [2]     tipo nodo (4 bit alti, 1 = BME280) | causa del reset (4 bit bassi,
+ *           solo nel pacchetto con contatore 0, altrimenti 0)
+ *   [3-4]   T °C x100 (int16)        [5-6]  UR % x100
+ *   [7-8]   P hPa x10                [9-10] Vbat a riposo, mV
+ *   [11-12] Vbat durante la trasmissione PRECEDENTE, mV
+ *   [13-14] CRC-16/CCITT-FALSE dei byte 0-12
+ * Misure non disponibili (sensore che non risponde, Vbat in trasmissione non
+ * misurata): T = 0x8000, gli altri campi 0xFFFF.
  */
 
 #include <Wire.h>
 
 // ---------- Configurazione ----------
-#define NODE_ID      2
+#define NODE_ID      2             // 1-15
 #define INTERVAL_MS  30000UL       // 30 s test; in esercizio 600000UL (10 min)
-#define DEBUG        1             // 0 = nessuna stampa (installazione definitiva)
+#define NODE_DEBUG   1             // 0 = nessuna stampa (installazione definitiva)
 
 #define P2P_FREQ     868100000UL   // 868,1 MHz: con BW 125 kHz resta tutta in 868,0-868,6 (duty cycle 1 %)
 #define P2P_SF       7
@@ -27,15 +36,46 @@
 #define P2P_PL       8
 #define P2P_TXP      14
 
-#define VBAT_MIN_MV  2800          // sotto: alimentazione bassa (il modulo funziona fino a 2000)
+#define VBAT_MIN_MV  2300          // 2 alcaline a ~1,15 V: quasi scariche (il modulo funziona fino a 2000)
 #define VBAT_MAX_MV  3600          // massimo di alimentazione del RAK3172 (2,0-3,6 V)
 // ------------------------------------
+
+#define FW_VERSION   "1.0"
+
+// Formato del pacchetto
+#define FMT_VERSION  1
+#define NODE_TYPE    1             // 1 = BME280, 2 = SHT45
+#define PKT_LEN      15
 
 // Valori "non disponibile" nel payload: fuori da qualsiasi misura reale
 #define ND_I16       ((int16_t)0x8000)
 #define ND_U16       0xFFFF
 
-#if DEBUG
+// Cause del reset (byte [2], 4 bit bassi)
+#define RST_NESSUNO     0          // pacchetto normale
+#define RST_ALIM        1          // accensione o calo di tensione (BOR)
+#define RST_PIN         2          // pin NRST
+#define RST_SOFTWARE    3          // riavvio da firmware (es. passaggio a P2P)
+#define RST_WATCHDOG    4          // watchdog indipendente (IWDG)
+#define RST_WWDG        5          // watchdog a finestra
+#define RST_LOWPOWER    6          // errore di gestione del basso consumo
+#define RST_ALTRO       7          // option byte o causa non riconosciuta
+
+// Watchdog: massimo 8 s in RUI3; continua a contare anche in sleep, quindi
+// lo sleep lungo è spezzato in tratti più brevi, con una ricarica fra l'uno e l'altro
+#define WDT_MS       8000
+#define SLEEP_STEP_MS 5000UL
+
+// Ritardo casuale sull'intervallo (±10 %): evita che due nodi accesi insieme
+// trasmettano sempre nello stesso istante e collidano a ogni ciclo
+#define JITTER_MS    (INTERVAL_MS / 10)
+
+// Pacchetto da ~46 ms in aria: con l'1 % di duty cycle servirebbero almeno 4,6 s
+// fra due trasmissioni. 10 s lascia margine anche con il ritardo casuale.
+static_assert(INTERVAL_MS >= 10000UL, "INTERVAL_MS troppo breve per il duty cycle");
+static_assert(NODE_ID >= 1 && NODE_ID <= 15, "NODE_ID deve stare fra 1 e 15");
+
+#if NODE_DEBUG
   #define DBG(...) Serial.printf(__VA_ARGS__)
 #else
   #define DBG(...) do {} while (0)
@@ -43,6 +83,8 @@
 
 uint8_t addr = 0;
 uint8_t seq = 0;
+uint8_t resetCause = RST_ALTRO;
+uint16_t vbatTx = ND_U16;            // misurata durante la trasmissione precedente
 volatile bool txDone = false;
 
 uint16_t T1, P1; int16_t T2, T3, P2, P3, P4, P5, P6, P7, P8, P9;
@@ -50,6 +92,85 @@ uint8_t H1, H3; int16_t H2, H4, H5; int8_t H6;
 int32_t t_fine;
 
 void sendDone(void) { txDone = true; }
+
+uint16_t readVbat() { return (uint16_t)(api.system.bat.get() * 1000); }
+
+// ---------- Causa del reset ----------
+// Va letta prima di abilitare il watchdog: RUI3 azzera i flag nell'abilitarlo.
+// Il flag BOR è attivo sia all'accensione sia dopo un calo di tensione: i due casi
+// si distinguono solo dalla tensione nello stesso pacchetto.
+uint8_t readResetCause() {
+  uint32_t csr = RCC->CSR;
+  RCC->CSR |= RCC_CSR_RMVF;          // i flag si accumulano fino a che non si azzerano
+  // Ogni reset interno attiva anche PINRSTF: l'ordine dei controlli conta
+  if (csr & RCC_CSR_IWDGRSTF) return RST_WATCHDOG;
+  if (csr & RCC_CSR_WWDGRSTF) return RST_WWDG;
+  if (csr & RCC_CSR_LPWRRSTF) return RST_LOWPOWER;
+  if (csr & RCC_CSR_SFTRSTF)  return RST_SOFTWARE;
+  if (csr & RCC_CSR_BORRSTF)  return RST_ALIM;
+  if (csr & RCC_CSR_PINRSTF)  return RST_PIN;
+  return RST_ALTRO;
+}
+
+const char *resetName(uint8_t c) {
+  switch (c) {
+    case RST_ALIM:     return "alimentazione";
+    case RST_PIN:      return "pin NRST";
+    case RST_SOFTWARE: return "software";
+    case RST_WATCHDOG: return "watchdog";
+    case RST_WWDG:     return "watchdog a finestra";
+    case RST_LOWPOWER: return "basso consumo";
+    default:           return "altro";
+  }
+}
+
+// ---------- CRC-16/CCITT-FALSE (poly 0x1021, init 0xFFFF) ----------
+uint16_t crc16(const uint8_t *p, uint8_t n) {
+  uint16_t crc = 0xFFFF;
+  while (n--) {
+    crc ^= (uint16_t)(*p++) << 8;
+    for (uint8_t i = 0; i < 8; i++)
+      crc = (crc & 0x8000) ? (uint16_t)((crc << 1) ^ 0x1021) : (uint16_t)(crc << 1);
+  }
+  return crc;
+}
+
+// Pacchetto formato v1 (vedi intestazione); la causa del reset va solo con seq 0
+void buildPacket(uint8_t *pl, uint8_t sq, uint8_t rst, int16_t t, uint16_t rh,
+                 uint16_t p, uint16_t vbat, uint16_t vtx) {
+  uint8_t i = 0;
+  pl[i++] = FMT_VERSION << 4 | NODE_ID;
+  pl[i++] = sq;
+  pl[i++] = NODE_TYPE << 4 | (sq == 0 ? rst : RST_NESSUNO);
+  pl[i++] = (uint16_t)t >> 8;  pl[i++] = (uint8_t)t;
+  pl[i++] = rh >> 8;           pl[i++] = (uint8_t)rh;
+  pl[i++] = p >> 8;            pl[i++] = (uint8_t)p;
+  pl[i++] = vbat >> 8;         pl[i++] = (uint8_t)vbat;
+  pl[i++] = vtx >> 8;          pl[i++] = (uint8_t)vtx;
+  uint16_t crc = crc16(pl, i);
+  pl[i++] = crc >> 8;          pl[i++] = (uint8_t)crc;
+}
+
+// ---------- Bus I2C ----------
+// Se il sensore si è fermato a metà di una trasmissione può tenere SDA basso e
+// bloccare il bus: 9 impulsi di clock gli fanno finire il byte, poi una
+// condizione di STOP lo riporta a riposo.
+void i2cRecover() {
+  Wire.end();
+  pinMode(PA11, INPUT_PULLUP);       // SDA
+  pinMode(PA12, OUTPUT);             // SCL
+  digitalWrite(PA12, HIGH);
+  delayMicroseconds(5);
+  for (uint8_t i = 0; i < 9 && digitalRead(PA11) == LOW; i++) {
+    digitalWrite(PA12, LOW);  delayMicroseconds(5);
+    digitalWrite(PA12, HIGH); delayMicroseconds(5);
+  }
+  pinMode(PA11, OUTPUT);             // STOP: SDA da basso ad alto con SCL alto
+  digitalWrite(PA11, LOW);  delayMicroseconds(5);
+  digitalWrite(PA12, HIGH); delayMicroseconds(5);
+  digitalWrite(PA11, HIGH); delayMicroseconds(5);
+  Wire.begin();
+}
 
 // ---------- BME280 ----------
 void wr(uint8_t reg, uint8_t val) {
@@ -148,19 +269,24 @@ bool bmeRead(int16_t &t100, uint16_t &rh100, uint16_t &p10) {
   // Valori di reset dei registri: il sensore si è riavviato e non ha misurato
   if (adcT == 0x80000 || adcP == 0x80000 || adcH == 0x8000) return false;
 
-  t100  = (int16_t)compT(adcT);
-  p10   = (uint16_t)(compP(adcP) / 2560);
-  rh100 = (uint16_t)((compH(adcH) * 100) >> 10);
+  int32_t  t = compT(adcT);
+  uint32_t p = compP(adcP) / 2560;
+  uint32_t h = (compH(adcH) * 100) >> 10;
+  // Fuori dal campo di misura del BME280: lettura corrotta, non una misura
+  if (t < -4000 || t > 8500 || p < 3000 || p > 11000 || h > 10000) return false;
+
+  t100 = (int16_t)t; p10 = (uint16_t)p; rh100 = (uint16_t)h;
   return true;
 }
 
-// Se la lettura fallisce il sensore viene reinizializzato (indirizzo, chip ID,
-// calibrazione) e riletto subito, così un errore transitorio non costa un ciclo.
-// Se non risponde ancora, ci si riprova al ciclo successivo.
+// Se la lettura fallisce il bus I2C viene sbloccato, il sensore reinizializzato
+// (indirizzo, chip ID, calibrazione) e riletto subito, così un errore transitorio
+// non costa un ciclo. Se non risponde ancora, ci si riprova al ciclo successivo.
 bool sensorRead(int16_t &t100, uint16_t &rh100, uint16_t &p10) {
   if (addr && bmeRead(t100, rh100, p10)) return true;
   if (addr) DBG("BME280: lettura fallita, reinizializzo\r\n");
   addr = 0;
+  i2cRecover();
   return bmeInit() && bmeRead(t100, rh100, p10);
 }
 
@@ -176,17 +302,22 @@ uint8_t errors = 0, fixes = 0;
   } while (0)
 
 void selfTest() {
-  DBG("\r\n=== Autodiagnosi nodo %u ===\r\n", NODE_ID);
+  DBG("\r\n=== Autodiagnosi nodo %u, firmware %s ===\r\n", NODE_ID, FW_VERSION);
+  DBG("[Avvio]\r\n  Causa reset: %s\r\n", resetName(resetCause));
 
   // 1. Modalità radio
   DBG("[Radio]\r\n");
   if (api.lorawan.nwm.get() != 0) {
-    DBG("  Modalità LoRaWAN: passo a P2P e riavvio...\r\n");
-    api.lora.nwm.set();
-    delay(200);
-    api.system.reboot();
+    if (api.lora.nwm.set()) {
+      DBG("  Modalità LoRaWAN: passo a P2P e riavvio...\r\n");
+      delay(200);
+      api.system.reboot();
+    }
+    // Senza P2P non si riavvia in continuazione: segnala e prosegue
+    DBG("  Modalità   ERRORE passaggio a P2P\r\n"); errors++;
+  } else {
+    DBG("  Modalità   P2P OK\r\n");
   }
-  DBG("  Modalità   P2P OK\r\n");
 
   // 2. Parametri P2P (salvati in flash, corretti solo se diversi)
   CHECK("Frequenza", api.lora.pfreq.get(), api.lora.pfreq.set(P2P_FREQ), P2P_FREQ);
@@ -202,48 +333,85 @@ void selfTest() {
 
   // 4. Alimentazione
   DBG("[Alimentazione]\r\n");
-  uint16_t vbat = (uint16_t)(api.system.bat.get() * 1000);
+  uint16_t vbat = readVbat();
   if (vbat < VBAT_MIN_MV)      { DBG("  Vbat %u mV BASSA\r\n", vbat); errors++; }
   else if (vbat > VBAT_MAX_MV) { DBG("  Vbat %u mV ALTA (max modulo %u mV)\r\n", vbat, VBAT_MAX_MV); errors++; }
   else                           DBG("  Vbat %u mV OK\r\n", vbat);
 
-  DBG("=== Esito: %u errori, %u correzioni. Intervallo %lu s ===\r\n\r\n",
-      errors, fixes, INTERVAL_MS / 1000);
+  DBG("=== Esito: %u errori, %u correzioni. Intervallo %lu s ±%lu s ===\r\n\r\n",
+      errors, fixes, INTERVAL_MS / 1000, JITTER_MS / 1000);
+}
+
+// ---------- Sleep con watchdog ----------
+// Il tempo si conta con millis(), che in RUI3 viene dall'RTC e avanza anche in
+// sleep: se uno sleep termina in anticipo (es. la radio tiene un wake lock) il
+// nodo si riaddormenta invece di accorciare l'intervallo e trasmettere prima.
+void sleepWithWatchdog(uint32_t ms) {
+  uint32_t start = millis();
+  uint32_t elapsed;
+  while ((elapsed = millis() - start) < ms) {
+    uint32_t left = ms - elapsed;
+    api.system.wdt.reset();
+    api.system.sleep.all(left > SLEEP_STEP_MS ? SLEEP_STEP_MS : left);
+  }
+  api.system.wdt.reset();
+}
+
+// Seme del generatore casuale diverso per ogni modulo (DevEUI) e per ogni avvio
+void seedRandom() {
+  uint8_t eui[8] = {0};
+  api.lorawan.deui.get(eui, 8);
+  uint32_t s = NODE_ID;
+  for (uint8_t i = 0; i < 8; i++) s = s * 31 + eui[i];
+  randomSeed(s ^ readVbat() ^ millis());
 }
 
 // ---------- Main ----------
 void setup() {
+  resetCause = readResetCause();     // prima di tutto, prima del watchdog
   Serial.begin(115200);
   delay(1500);                       // tempo per aprire il monitor seriale
   Wire.begin();
   api.lora.registerPSendCallback(sendDone);
   selfTest();
+  seedRandom();
+  api.system.wdt.enable(WDT_MS);     // da qui il nodo si riavvia se resta bloccato più di 8 s
 }
 
 void loop() {
+  api.system.wdt.reset();
+
   int16_t t; uint16_t rh, p;
   bool ok = sensorRead(t, rh, p);
   if (!ok) { t = ND_I16; rh = ND_U16; p = ND_U16; }
+  uint16_t vbat = readVbat();
 
-  uint16_t vbat = (uint16_t)(api.system.bat.get() * 1000);
-  uint8_t pl[10] = {
-    NODE_ID, seq++,
-    (uint8_t)(t >> 8), (uint8_t)t,
-    (uint8_t)(rh >> 8), (uint8_t)rh,
-    (uint8_t)(p >> 8), (uint8_t)p,
-    (uint8_t)(vbat >> 8), (uint8_t)vbat
-  };
+  uint8_t pl[PKT_LEN];
+  buildPacket(pl, seq, resetCause, t, rh, p, vbat, vbatTx);
+
   if (ok) DBG("T=%.2f C  UR=%.2f %%  P=%.1f hPa  ", t / 100.0f, rh / 100.0f, p / 10.0f);
   else    DBG("BME280 NON RISPONDE  ");
-  DBG("Vbat=%u mV  seq=%u  ", vbat, pl[1]);
+  DBG("Vbat=%u mV  Vtx=%u mV  seq=%u  ", vbat, vbatTx, seq);
+  if (seq == 0) DBG("(avvio: %s)  ", resetName(resetCause));
+
+  // Il contatore avanza anche se l'invio fallisce: il salto segnala il pacchetto mancato
+  seq = (seq == 255) ? 1 : seq + 1;
 
   txDone = false;
+  vbatTx = ND_U16;
   if (api.lora.psend(sizeof(pl), pl)) {
+    // Tensione sotto carico: a metà dei ~46 ms di trasmissione.
+    // Va nel pacchetto successivo, questo è già partito.
+    delay(20);
+    if (!txDone) vbatTx = readVbat();
     uint32_t t0 = millis();
     while (!txDone && millis() - t0 < 3000) delay(10);
     DBG(txDone ? "TX ok\r\n" : "TX timeout\r\n");
   } else {
     DBG("ERRORE psend\r\n");
   }
-  api.system.sleep.all(INTERVAL_MS);
+
+  // Intervallo ± ritardo casuale
+  uint32_t wait = INTERVAL_MS - JITTER_MS + (uint32_t)random(2 * JITTER_MS + 1);
+  sleepWithWatchdog(wait);
 }
