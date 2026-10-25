@@ -1,5 +1,8 @@
 /*
  * Ricevitore LoRa P2P - RAK3172 (RUI3 >= 4.1)
+ * Autore: Davide Bertolino
+ * Firmware 1.2 (aggiornare insieme a FW_VERSION)
+ *
  * Verifica e decodifica i pacchetti dei nodi (formato v1: BME280 15 byte,
  * SHT45 13 byte) e li stampa in CSV su seriale per il bridge sul Raspberry.
  *
@@ -24,7 +27,7 @@
 #define P2P_TXP   14
 // -----------------------------------------------------
 
-#define FW_VERSION    "1.0"
+#define FW_VERSION    "1.2"
 
 // Formato del pacchetto (uguale ai nodi)
 #define FMT_VERSION   1
@@ -39,6 +42,7 @@
 
 #define WDT_MS        8000
 #define STATS_MS      600000UL      // statistiche e riavvio della ricezione ogni 10 min
+#define START_WAIT_MS 30000UL       // attesa dopo il messaggio di benvenuto, prima di partire
 
 // ---------- Coda fra interrupt e loop ----------
 #define QUEUE_LEN     8             // potenza di 2
@@ -166,6 +170,28 @@ void handlePacket(const RxPacket &p) {
 }
 
 // ---------- Avvio ----------
+// Messaggio di benvenuto, poi attesa con conto alla rovescia: tempo per aprire
+// il monitor seriale e vedere l'avvio dall'inizio
+void welcome() {
+  Serial.println("#");
+  Serial.printf("# Ricevitore Link LoRa, firmware %s\r\n", FW_VERSION);
+  for (uint32_t s = START_WAIT_MS / 1000; s > 0; s -= 5) {
+    Serial.printf("# avvio fra %lu s\r\n", (unsigned long)s);
+    delay(5000);
+  }
+}
+
+// pbw.get() di RUI3 4.3.0 restituisce l'indice della banda (0 = 125 kHz,
+// 1 = 250, 2 = 500), pbw.set() accetta i kHz: si confronta in kHz
+uint32_t bwKhz(uint32_t v) {
+  switch (v) {
+    case 0:  return 125;
+    case 1:  return 250;
+    case 2:  return 500;
+    default: return v;
+  }
+}
+
 void selfTest(uint8_t rst) {
   Serial.println("#");
   Serial.printf("# === Autodiagnosi ricevitore, firmware %s ===\r\n", FW_VERSION);
@@ -185,7 +211,7 @@ void selfTest(uint8_t rst) {
 
   CHECK("Frequenza", api.lora.pfreq.get(), api.lora.pfreq.set(P2P_FREQ), P2P_FREQ);
   CHECK("SF",        api.lora.psf.get(),   api.lora.psf.set(P2P_SF),     P2P_SF);
-  CHECK("Banda",     api.lora.pbw.get(),   api.lora.pbw.set(P2P_BW),     P2P_BW);
+  CHECK("Banda",     bwKhz(api.lora.pbw.get()), api.lora.pbw.set(P2P_BW), P2P_BW);
   CHECK("CR",        api.lora.pcr.get(),   api.lora.pcr.set(P2P_CR),     P2P_CR);
   CHECK("Preambolo", api.lora.ppl.get(),   api.lora.ppl.set(P2P_PL),     P2P_PL);
   CHECK("Potenza",   api.lora.ptp.get(),   api.lora.ptp.set(P2P_TXP),    P2P_TXP);
@@ -205,7 +231,7 @@ void startRx() {
 void setup() {
   uint8_t rst = readResetCause();  // prima del watchdog
   Serial.begin(115200);
-  delay(1500);                     // tempo per aprire il monitor seriale
+  welcome();                       // e 30 s di attesa, prima del watchdog
   api.lora.registerPRecvCallback(recvCallback);
   selfTest(rst);                   // parametri corretti PRIMA di avviare la ricezione
   api.system.wdt.enable(WDT_MS);

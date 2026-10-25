@@ -1,5 +1,8 @@
 /*
  * Nodo sensore T/UR/pressione - RAK3172 (RUI3 >= 4.1) + BME280 - LoRa P2P
+ * Autore: Davide Bertolino
+ * Firmware 1.1 (aggiornare insieme a FW_VERSION)
+ *
  * Con autodiagnosi all'avvio: controlla e corregge modalità radio e parametri P2P,
  * verifica sensore e alimentazione.
  *
@@ -40,7 +43,7 @@
 #define VBAT_MAX_MV  3600          // massimo di alimentazione del RAK3172 (2,0-3,6 V)
 // ------------------------------------
 
-#define FW_VERSION   "1.0"
+#define FW_VERSION   "1.1"
 
 // Formato del pacchetto
 #define FMT_VERSION  1
@@ -301,6 +304,17 @@ uint8_t errors = 0, fixes = 0;
     else { DBG("  %-10s ERRORE impostazione (%lu)\r\n", name, c_); errors++; }     \
   } while (0)
 
+// pbw.get() di RUI3 4.3.0 restituisce l'indice della banda (0 = 125 kHz,
+// 1 = 250, 2 = 500), pbw.set() accetta i kHz: si confronta in kHz
+uint32_t bwKhz(uint32_t v) {
+  switch (v) {
+    case 0:  return 125;
+    case 1:  return 250;
+    case 2:  return 500;
+    default: return v;
+  }
+}
+
 void selfTest() {
   DBG("\r\n=== Autodiagnosi nodo %u, firmware %s ===\r\n", NODE_ID, FW_VERSION);
   DBG("[Avvio]\r\n  Causa reset: %s\r\n", resetName(resetCause));
@@ -322,7 +336,7 @@ void selfTest() {
   // 2. Parametri P2P (salvati in flash, corretti solo se diversi)
   CHECK("Frequenza", api.lora.pfreq.get(), api.lora.pfreq.set(P2P_FREQ), P2P_FREQ);
   CHECK("SF",        api.lora.psf.get(),   api.lora.psf.set(P2P_SF),     P2P_SF);
-  CHECK("Banda",     api.lora.pbw.get(),   api.lora.pbw.set(P2P_BW),     P2P_BW);
+  CHECK("Banda",     bwKhz(api.lora.pbw.get()), api.lora.pbw.set(P2P_BW), P2P_BW);
   CHECK("CR",        api.lora.pcr.get(),   api.lora.pcr.set(P2P_CR),     P2P_CR);
   CHECK("Preambolo", api.lora.ppl.get(),   api.lora.ppl.set(P2P_PL),     P2P_PL);
   CHECK("Potenza",   api.lora.ptp.get(),   api.lora.ptp.set(P2P_TXP),    P2P_TXP);

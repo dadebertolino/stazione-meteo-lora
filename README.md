@@ -10,19 +10,20 @@ nodo BME280 (ID 2) ──┐
                      │  LoRa P2P 868,1 MHz        seriale USB, CSV
 nodo SHT45 (ID 1)* ──┴───────────────────► ricevitore ──────────────► PC o Raspberry
                                                                        registratore (prove)
-                                                                       bridge Python*
+                                                                       bridge ──► sito WordPress*
 ```
 
 \* non ancora realizzati.
 
 | Componente | Ruolo | Stato |
 |---|---|---|
-| [`nodo_bme280/`](nodo_bme280/nodo_bme280.ino) | nodo temperatura, umidità, pressione con sensore BME280 | firmware 1.0, in prova |
-| [`ricevitore_p2p/`](ricevitore_p2p/ricevitore_p2p.ino) | ricevitore: verifica e decodifica i pacchetti, li stampa in CSV | firmware 1.0, in prova |
+| [`nodo_bme280/`](nodo_bme280/nodo_bme280.ino) | nodo temperatura, umidità, pressione con sensore BME280 | firmware 1.1, in prova |
+| [`ricevitore_p2p/`](ricevitore_p2p/ricevitore_p2p.ino) | ricevitore: verifica e decodifica i pacchetti, li stampa in CSV | firmware 1.2, in prova |
 | [`registratore/`](registratore/registra.py) | salva la seriale del ricevitore con l'ora di arrivo, per le prove | pronto |
 | [`test_banco/`](test_banco/esegui.sh) | prove del formato dei pacchetti sul PC, senza schede | 17 test |
 | nodo SHT45 | nodo temperatura e umidità | da scrivere quando arrivano i componenti; il ricevitore ne decodifica già il pacchetto |
-| bridge Python | archivio dei dati, allarmi sui nodi muti | da scrivere |
+| [`bridge/`](bridge/README.md) | sul Raspberry: aggiunge data e ora, coda locale, invio al sito | struttura |
+| [`db-stazione-meteo/`](db-stazione-meteo/README.md) | plugin WordPress: riceve le misure e le mostra sul sito della scuola | struttura |
 
 Ogni sketch sta in una cartella con lo stesso nome del file `.ino`, come richiede
 l'IDE Arduino. Si compilano con il pacchetto di schede RAKwireless RUI3
@@ -193,9 +194,12 @@ i due eventi che la radio segnala insieme, "pacchetto ricevuto" ed "errore CRC":
 
 Il ricevitore scarta il secondo richiamo guardando `Status`, il primo con il CRC
 del payload. Il CRC scarta anche i pacchetti di altri dispositivi che usano gli
-stessi parametri radio. È una deduzione dai sorgenti del core
-(`service_lora_p2p.c`, `radio.c`, `stm32wlxx_hal_subghz.c`), non ancora
-osservata sulla scheda: vedi [Prove](#prove).
+stessi parametri radio. Dedotto dai sorgenti del core (`service_lora_p2p.c`,
+`radio.c`, `stm32wlxx_hal_subghz.c`) e **confermato sulla scheda** il
+25/10/2026: in circa 2 ore e mezza sono arrivati 11 pacchetti estranei da 24
+byte (RSSI ~−110 dBm, SNR negativo), ciascuno consegnato prima come ricevuto,
+con il payload corrotto, poi come errore radio. Il ricevitore li ha scartati
+tutti, 11 per CRC e 11 per `Status`, senza righe duplicate.
 
 ### Contatore e riavvii
 
@@ -265,6 +269,10 @@ Seriale a 115200 baud, una riga per pacchetto valido (valori di esempio):
 | `coda piena` | pacchetti arrivati più in fretta di quanto il ricevitore li stampi |
 | `troppo lunghi` | oltre 32 byte |
 
+All'accensione il ricevitore stampa un messaggio di benvenuto con la versione
+del firmware e aspetta 30 s (`START_WAIT_MS`), con un conto alla rovescia ogni
+5 s, prima dell'autodiagnosi e della ricezione.
+
 La callback di ricezione gira nell'interrupt della radio: lì il pacchetto viene
 solo copiato in una coda di 7 posti, verifica e stampa avvengono in `loop()`.
 Anche il ricevitore ha il watchdog a 8 s, e ogni 10 minuti riavvia la ricezione
@@ -330,7 +338,6 @@ Da provare sulle schede:
 
 | Questione | Dettaglio |
 |---|---|
-| **Doppio richiamo sugli errori CRC** | dedotto dai sorgenti, da confermare sulla scheda |
 | **Tempo della misura sotto carico** | la tensione si legge 20 ms dopo l'avvio della trasmissione, che dura ~46 ms; quanto dura la lettura di `bat.get()` non è documentato. Se la trasmissione finisce prima, `vbat_tx_mV` resta vuota |
 | **Comportamento a batterie scariche** | oggi il nodo trasmette finché si spegne; si potrebbe allungare l'intervallo sotto una soglia |
 | **Bridge** | archivio, allarme sul nodo muto (nessun pacchetto per 2-3 intervalli), pacchetti persi, duplicati e riavvii per nodo |
