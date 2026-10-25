@@ -1,0 +1,15 @@
+[Unit]
+Description=Bridge stazione meteo LoRa -> WordPress
+After=network-online.target time-sync.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=meteo
+WorkingDirectory=/opt/meteo-bridge
+ExecStart=/usr/bin/python3 -m meteo_bridge --config /etc/meteo-bridge/config.toml
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target

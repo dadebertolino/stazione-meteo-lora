@@ -1,0 +1,15 @@
+# Python
+__pycache__/
+*.pyc
+
+# Prove al banco (generati da test_banco/esegui.sh)
+test_banco/banco
+test_banco/estratto.inc
+
+# Registrazioni e configurazioni locali del bridge
+registrazioni/
+config.toml
+*.sqlite
+
+# macOS
+.DS_Store

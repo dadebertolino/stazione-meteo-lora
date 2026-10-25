@@ -1,0 +1,16 @@
+# Configurazione del bridge: copiare in /etc/meteo-bridge/config.toml
+
+[seriale]
+# Nome stabile della porta, non /dev/ttyUSB0 che può cambiare.
+# Elenco: ls /dev/serial/by-id/
+porta = "/dev/serial/by-id/usb-FTDI_..."
+baud = 115200
+
+[coda]
+database = "/var/lib/meteo-bridge/coda.sqlite"
+
+[sito]
+url = "https://www.esempio-scuola.edu.it/wp-json/dbmt/v1/misure"
+# Generato in WordPress: Impostazioni → Stazione Meteo
+token = ""
+intervallo_invio_s = 300

@@ -1,9 +1,18 @@
-# Link LoRa
+# Stazione meteo LoRa
 
-Rete di sensori **LoRa P2P** basata su moduli **RAK3172** (firmware RUI3 ≥ 4.1).
-I nodi trasmettono le misure direttamente a un ricevitore, senza rete LoRaWAN e
-senza gateway; il ricevitore le verifica e le stampa in CSV su seriale. È
-indipendente dal datalogger MicroMET3.
+Stazione meteo scolastica su rete di sensori **LoRa P2P** con moduli **RAK3172**
+(firmware RUI3 ≥ 4.1). I nodi trasmettono le misure direttamente a un
+ricevitore, senza rete LoRaWAN e senza gateway; il ricevitore le verifica e le
+stampa in CSV su seriale; un Raspberry aggiunge data e ora e le invia al sito
+della scuola.
+
+**Autore:** [Davide Bertolino](https://www.davidebertolino.it) ·
+**Licenze:** software GPL v2 o successive ([`LICENSE`](LICENSE)), hardware
+CERN-OHL-S v2 ([`hardware/LICENSE`](hardware/LICENSE))
+
+Il plugin WordPress che mostra i dati sul sito è in un repository a parte,
+[dadebertolino/db-stazione-meteo](https://github.com/dadebertolino/db-stazione-meteo),
+perché si aggiorna da solo dalle sue release.
 
 ```
 nodo BME280 (ID 2) ──┐
@@ -23,7 +32,8 @@ nodo SHT45 (ID 1)* ──┴─────────────────�
 | [`test_banco/`](test_banco/esegui.sh) | prove del formato dei pacchetti sul PC, senza schede | 17 test |
 | nodo SHT45 | nodo temperatura e umidità | da scrivere quando arrivano i componenti; il ricevitore ne decodifica già il pacchetto |
 | [`bridge/`](bridge/README.md) | sul Raspberry: aggiunge data e ora, coda locale, invio al sito | struttura |
-| [`db-stazione-meteo/`](db-stazione-meteo/README.md) | plugin WordPress: riceve le misure e le mostra sul sito della scuola | struttura |
+| [`hardware/`](hardware/README.md) | schemi e collegamenti delle schede | da disegnare |
+| [db-stazione-meteo](https://github.com/dadebertolino/db-stazione-meteo) | plugin WordPress: riceve le misure e le mostra sul sito della scuola (repository a parte) | struttura |
 
 Ogni sketch sta in una cartella con lo stesso nome del file `.ino`, come richiede
 l'IDE Arduino. Si compilano con il pacchetto di schede RAKwireless RUI3
@@ -298,8 +308,7 @@ ricevitore riavviato) riprova ogni 5 s e registra solo i cambi di stato. Si ferm
 con Ctrl+C o `SIGTERM`.
 
 L'ora è quella del computer: **deve essere sincronizzata** (NTP). Senza l'ora di
-arrivo i dati delle prove servono a poco, come ha insegnato l'orologio della
-MicroMET3.
+arrivo i dati delle prove servono a poco.
 
 ## Prove
 
@@ -319,7 +328,7 @@ Le prove sul formato dei pacchetti si rilanciano dopo ogni modifica agli sketch
 (serve un compilatore C++ e python3):
 
 ```bash
-sh "Link LORA/test_banco/esegui.sh"
+sh test_banco/esegui.sh
 ```
 
 Da provare sulle schede:

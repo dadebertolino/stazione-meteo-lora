@@ -1,0 +1,3 @@
+# Su Raspberry Pi OS: sudo apt install python3-serial python3-requests
+pyserial>=3.5
+requests>=2.28
