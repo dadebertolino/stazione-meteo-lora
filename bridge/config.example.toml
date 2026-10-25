@@ -10,7 +10,8 @@ baud = 115200
 database = "/var/lib/meteo-bridge/coda.sqlite"
 
 [sito]
+# Indirizzo mostrato in WordPress: Impostazioni → Stazione Meteo (solo https)
 url = "https://www.esempio-scuola.edu.it/wp-json/dbmt/v1/misure"
-# Generato in WordPress: Impostazioni → Stazione Meteo
+# Generato nella stessa pagina; si vede una sola volta
 token = ""
 intervallo_invio_s = 300
