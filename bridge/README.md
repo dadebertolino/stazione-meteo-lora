@@ -9,7 +9,30 @@ ricevitore ──USB──► seriale.py ──► decodifica.py ──► coda.
                                     data e ora                              ogni 5 min, con token
 ```
 
-**Stato:** struttura, non ancora operativo.
+**Stato:** lettura della seriale, coda SQLite e invio al sito funzionanti, provati con il ricevitore e con un WordPress locale. Manca l'installazione sul Raspberry.
+
+## Prova sul PC
+
+```bash
+python3 -m pip install pyserial   # nello stesso Python che lancia il bridge
+cd bridge
+python3 -m meteo_bridge --porta /dev/cu.usbserial-XXXX --database coda.sqlite \
+    --url http://sito-di-prova.local/wp-json/dbmt/v1/misure --token <token> --intervallo 60
+```
+
+Senza `--url` le misure restano in coda. L'indirizzo deve essere `https`: `http` è ammesso solo per `localhost` e i siti `.local`, perché il token viaggerebbe in chiaro.
+
+Su Windows la porta è del tipo `COM5`. Ogni riga del ricevitore viene stampata; quelle di dati finiscono in coda con l'ora di arrivo in UTC:
+
+```
+2,41,bme280,,18.33,57.24,964.7,3000,3000,-51,14  [accodata, in coda: 12]
+```
+
+Si ferma con Ctrl+C: le misure restano nel file e il bridge le ritrova al riavvio. Per guardarle:
+
+```bash
+sqlite3 coda.sqlite "select ricevuto, nodo, seq, temp_c, ur_pct, press_hpa from misure order by id desc limit 10"
+```
 
 Il formato dei dati inviati e delle risposte è definito nel [README del plugin](https://github.com/dadebertolino/db-stazione-meteo#formato-dei-dati-bridge--plugin).
 
@@ -21,7 +44,7 @@ Il formato dei dati inviati e delle risposte è definito nel [README del plugin]
 | `meteo_bridge/seriale.py` | lettura della seriale in sola lettura, ripresa se la porta sparisce |
 | `meteo_bridge/decodifica.py` | riga CSV del ricevitore → misura; scarta le righe `#` e `+EVT` |
 | `meteo_bridge/coda.py` | coda SQLite: le misure restano finché il sito non conferma |
-| `meteo_bridge/invio.py` | POST a gruppi verso `/wp-json/dbmt/v1/misure` |
+| `meteo_bridge/invio.py` | POST a gruppi di 500 verso `/wp-json/dbmt/v1/misure`, in un thread, solo libreria standard |
 | `meteo_bridge/orologio.py` | attesa della sincronizzazione NTP prima di registrare |
 | `config.example.toml` | configurazione di esempio |
 | `systemd/meteo-bridge.service` | servizio che parte all'avvio e riparte se si ferma |
@@ -40,5 +63,5 @@ Il formato dei dati inviati e delle risposte è definito nel [README del plugin]
 Raspberry Pi OS Bookworm (Python 3.11, per leggere la configurazione TOML):
 
 ```bash
-sudo apt install python3-serial python3-requests
+sudo apt install python3-serial
 ```
