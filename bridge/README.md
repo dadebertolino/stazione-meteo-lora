@@ -9,7 +9,7 @@ ricevitore ──USB──► seriale.py ──► decodifica.py ──► coda.
                                     data e ora                              ogni 5 min, con token
 ```
 
-**Stato:** lettura della seriale, coda SQLite e invio al sito funzionanti, provati con il ricevitore e con un WordPress locale. Manca l'installazione sul Raspberry.
+**Stato:** lettura della seriale, coda SQLite e invio al sito funzionanti, provati con il ricevitore e con un WordPress locale. Script di installazione per il Raspberry pronto, da provare sul Pi.
 
 ## Prova sul PC
 
@@ -36,6 +36,56 @@ sqlite3 coda.sqlite "select ricevuto, nodo, seq, temp_c, ur_pct, press_hpa from 
 
 Il formato dei dati inviati e delle risposte è definito nel [README del plugin](https://github.com/dadebertolino/db-stazione-meteo#formato-dei-dati-bridge--plugin).
 
+## Installazione sul Raspberry
+
+Serve Raspberry Pi OS Lite (Bookworm o più recente), con SSH attivo e la rete. Sul Pi:
+
+```bash
+sudo apt install -y git
+git clone https://github.com/dadebertolino/stazione-meteo-lora
+sudo bash stazione-meteo-lora/bridge/installa.sh
+```
+
+Lo script installa Python e pyserial, crea l'utente di servizio `meteo`, copia il codice in `/opt/meteo-bridge`, scrive `/etc/meteo-bridge/config.toml` (leggibile solo da root e dal servizio, perché contiene il token), attiva NTP, **prova il collegamento con il sito** con un invio vuoto e avvia il servizio `meteo-bridge`. Chiede quello che non trova: la porta del ricevitore (se c'è un solo dispositivo USB lo riconosce da solo), l'indirizzo e il token, che si scrivono senza che compaiano a schermo.
+
+| Opzione | Quando serve |
+|---|---|
+| `--porta /dev/serial0` | ricevitore collegato al GPIO invece che all'USB |
+| `--url https://…/wp-json/dbmt/v1/misure` | per non doverlo scrivere a mano |
+| `--ntp ntp.scuola.it` | la rete blocca i server NTP pubblici |
+| `--proxy http://proxy:3128` | la rete esce su internet solo da un proxy |
+
+Rilanciarlo aggiorna il codice e riavvia il servizio, tenendo la configurazione. Per aggiornare: `cd stazione-meteo-lora && git pull && sudo bash bridge/installa.sh`.
+
+```bash
+journalctl -u meteo-bridge -f          # log in diretta
+sudo systemctl restart meteo-bridge    # riavvio, per esempio dopo aver modificato config.toml
+```
+
+## Ricevitore sul GPIO invece che sull'USB
+
+Il ricevitore può stare sul connettore del Raspberry, senza adattatore USB. Il bridge legge soltanto, quindi basta un filo per i dati: **il TX del Pi resta scollegato**, così sul ricevitore non può arrivare nessun comando AT per errore.
+
+| RAK3272S | Raspberry Pi 3 |
+|---|---|
+| VDD (3,3 V) | pin 1 (3,3 V) |
+| GND | pin 6 (GND) |
+| PA2, TX della UART2 | pin 10, GPIO15 (RXD) |
+
+Per aggiornare il firmware del ricevitore si torna all'adattatore USB.
+
+Sul Pi 3 la UART "buona" (PL011) è usata dal Bluetooth; quella che resta ha la velocità legata alla frequenza della CPU e perde caratteri. Quindi, una volta:
+
+```bash
+sudo raspi-config nonint do_serial_cons 1   # niente console di login sulla seriale
+sudo raspi-config nonint do_serial_hw 0     # UART attiva
+echo 'dtoverlay=disable-bt' | sudo tee -a /boot/firmware/config.txt
+sudo systemctl disable hciuart
+sudo reboot
+```
+
+Poi `sudo bash stazione-meteo-lora/bridge/installa.sh --porta /dev/serial0`.
+
 ## Moduli
 
 | File | Ruolo |
@@ -47,7 +97,8 @@ Il formato dei dati inviati e delle risposte è definito nel [README del plugin]
 | `meteo_bridge/invio.py` | POST a gruppi di 500 verso `/wp-json/dbmt/v1/misure`, in un thread, solo libreria standard |
 | `meteo_bridge/orologio.py` | attesa della sincronizzazione NTP prima di registrare |
 | `config.example.toml` | configurazione di esempio |
-| `systemd/meteo-bridge.service` | servizio che parte all'avvio e riparte se si ferma |
+| `installa.sh` | installazione e aggiornamento sul Raspberry |
+| `systemd/meteo-bridge.service` | servizio che parte all'avvio e riparte se si ferma; non può scrivere fuori da `/var/lib/meteo-bridge` |
 | `tests/` | test senza ricevitore: `python3 -m unittest discover tests` |
 
 ## Scelte
