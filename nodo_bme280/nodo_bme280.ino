@@ -1,13 +1,14 @@
 /*
  * Nodo sensore T/UR/pressione - RAK3172 (RUI3 >= 4.1) + BME280 - LoRa P2P
  * Autore: Davide Bertolino
- * Firmware 1.1 (aggiornare insieme a FW_VERSION)
+ * Firmware 1.2 (aggiornare insieme a FW_VERSION)
  *
  * Con autodiagnosi all'avvio: controlla e corregge modalità radio e parametri P2P,
  * verifica sensore e alimentazione.
  *
  * Alimentazione: 2 stilo AA alcaline collegate direttamente al pin 3V3 del modulo
- * (2,0-3,6 V), senza regolatore: api.system.bat.get() misura così le batterie.
+ * (2,0-3,6 V), senza regolatore: la tensione di alimentazione del modulo è quella
+ * delle batterie, e il nodo la misura con il riferimento interno (readVbat).
  *
  * Collegamenti: VCC->3V3, GND->GND, SDA->PA11, SCL->PA12
  * (moduli a 6 pin: CSB a 3V3 per I2C, SDO a GND = 0x76, a 3V3 = 0x77)
@@ -43,7 +44,7 @@
 #define VBAT_MAX_MV  3600          // massimo di alimentazione del RAK3172 (2,0-3,6 V)
 // ------------------------------------
 
-#define FW_VERSION   "1.1"
+#define FW_VERSION   "1.2"
 
 // Formato del pacchetto
 #define FMT_VERSION  1
@@ -96,7 +97,28 @@ int32_t t_fine;
 
 void sendDone(void) { txDone = true; }
 
-uint16_t readVbat() { return (uint16_t)(api.system.bat.get() * 1000); }
+// Tensione di alimentazione = tensione delle batterie (niente regolatore), in mV.
+// Si misura il riferimento interno VREFINT dell'STM32WL e lo si confronta con
+// la sua taratura di fabbrica (VREFINT_CAL, acquisita a 3,3 V): più la tensione
+// è bassa, più VREFINT occupa la scala dell'ADC. È il metodo che RUI3 usa sul
+// RAK3172-SiP; sul RAK3172 api.system.bat.get() di RUI3 4.3.0 non legge l'ADC
+// (service_battery.c) e restituisce sempre 3,0 V.
+uint16_t readVbat() {
+  UDRV_ADC_RESOLUTION prima = udrv_adc_get_resolution();
+  udrv_adc_set_resolution(UDRV_ADC_RESOLUTION_12BIT);
+  uint32_t somma = 0;
+  uint8_t n = 0;
+  for (uint8_t i = 0; i < 5; i++) {
+    int16_t v = 0;                   // udrv_adc_read vuole int16_t; a 12 bit il valore sta fra 0 e 4095
+    if (udrv_adc_read(UDRV_ADC_CHANNEL_VREFINT, &v) != UDRV_RETURN_OK || v <= 0) continue;
+    if (i == 0) continue;            // la prima conversione dopo l'accensione del riferimento è meno precisa
+    somma += (uint32_t)v;
+    n++;
+  }
+  udrv_adc_set_resolution(prima);
+  if (n == 0) return ND_U16;
+  return (uint16_t)__LL_ADC_CALC_VREFANALOG_VOLTAGE(somma / n, LL_ADC_RESOLUTION_12B);
+}
 
 // ---------- Causa del reset ----------
 // Va letta prima di abilitare il watchdog: RUI3 azzera i flag nell'abilitarlo.
@@ -348,7 +370,8 @@ void selfTest() {
   // 4. Alimentazione
   DBG("[Alimentazione]\r\n");
   uint16_t vbat = readVbat();
-  if (vbat < VBAT_MIN_MV)      { DBG("  Vbat %u mV BASSA\r\n", vbat); errors++; }
+  if (vbat == ND_U16)          { DBG("  Vbat ERRORE lettura ADC\r\n"); errors++; }
+  else if (vbat < VBAT_MIN_MV) { DBG("  Vbat %u mV BASSA\r\n", vbat); errors++; }
   else if (vbat > VBAT_MAX_MV) { DBG("  Vbat %u mV ALTA (max modulo %u mV)\r\n", vbat, VBAT_MAX_MV); errors++; }
   else                           DBG("  Vbat %u mV OK\r\n", vbat);
 

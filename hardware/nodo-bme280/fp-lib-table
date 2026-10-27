@@ -1,0 +1,4 @@
+(fp_lib_table
+	(version 7)
+	(lib (name "stazione-meteo")(type "KiCad")(uri "${KIPRJMOD}/../librerie/stazione-meteo.pretty")(options "")(descr "Impronte della stazione meteo LoRa"))
+)
