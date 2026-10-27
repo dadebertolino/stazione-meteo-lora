@@ -26,13 +26,13 @@ nodo SHT45 (ID 1)* ──┴─────────────────�
 
 | Componente | Ruolo | Stato |
 |---|---|---|
-| [`nodo_bme280/`](nodo_bme280/nodo_bme280.ino) | nodo temperatura, umidità, pressione con sensore BME280 | firmware 1.1, in prova |
+| [`nodo_bme280/`](nodo_bme280/nodo_bme280.ino) | nodo temperatura, umidità, pressione con sensore BME280 | firmware 1.2, in prova |
 | [`ricevitore_p2p/`](ricevitore_p2p/ricevitore_p2p.ino) | ricevitore: verifica e decodifica i pacchetti, li stampa in CSV | firmware 1.2, in prova |
 | [`registratore/`](registratore/registra.py) | salva la seriale del ricevitore con l'ora di arrivo, per le prove | pronto |
 | [`test_banco/`](test_banco/esegui.sh) | prove del formato dei pacchetti sul PC, senza schede | 17 test |
 | nodo SHT45 | nodo temperatura e umidità | da scrivere quando arrivano i componenti; il ricevitore ne decodifica già il pacchetto |
 | [`bridge/`](bridge/README.md) | sul Raspberry: aggiunge data e ora, coda locale, invio al sito | struttura |
-| [`hardware/`](hardware/README.md) | schemi e collegamenti delle schede | da disegnare |
+| [`hardware/`](hardware/README.md) | progetti KiCad delle schede: nodo BME280 e ricevitore, libreria condivisa | progetti vuoti, scelte da fare |
 | [db-stazione-meteo](https://github.com/dadebertolino/db-stazione-meteo) | plugin WordPress: riceve le misure e le mostra sul sito della scuola (repository a parte) | struttura |
 
 Ogni sketch sta in una cartella con lo stesso nome del file `.ino`, come richiede
@@ -95,7 +95,14 @@ LoRaWAN possono esserci collisioni, visibili come salti nel contatore.
 
 **Due stilo AA alcaline** collegate direttamente al pin 3V3 del modulo, senza
 regolatore: il RAK3172 funziona fra 2,0 e 3,6 V, e senza regolatore
-`api.system.bat.get()` misura proprio la tensione delle batterie.
+la tensione di alimentazione del modulo è quella delle
+batterie. Il nodo la misura con il riferimento interno dell'STM32WL (VREFINT),
+confrontato con la sua taratura di fabbrica.
+
+`api.system.bat.get()` di RUI3 non va usata: nel core 4.3.0
+(`service_battery.c`) legge l'ADC solo sul RAK3172-SiP e sulle basi WisBlock;
+sul RAK3172 restituisce sempre 3,0 V, ed è il valore fisso che il nodo
+trasmetteva fino al firmware 1.1.
 
 | Stato | Tensione (2 × AA) | Per cella |
 |---|---|---|
@@ -341,12 +348,13 @@ Da provare sulle schede:
 | Tasto di reset del nodo | `seq` 0, causa 2 |
 | Nodo lontano, al limite della portata | contatori `CRC errato` ed `errori radio` nelle statistiche: confermano o smentiscono il doppio richiamo descritto sopra |
 | Consumo in sleep, con un multimetro in serie | dà l'autonomia reale; i risvegli ogni 5 s per il watchdog compaiono come brevi picchi |
+| Firmware 1.2: multimetro fra 3V3 e GND del nodo | la tensione letta deve coincidere con `vbat_mV` entro qualche decina di mV |
 | Alimentatore da banco abbassato piano da 3,2 a 2,0 V | comportamento a batterie scariche: riavvii, causa, tensioni |
 
 ## Punti aperti
 
 | Questione | Dettaglio |
 |---|---|
-| **Tempo della misura sotto carico** | la tensione si legge 20 ms dopo l'avvio della trasmissione, che dura ~46 ms; quanto dura la lettura di `bat.get()` non è documentato. Se la trasmissione finisce prima, `vbat_tx_mV` resta vuota |
+| **Tempo della misura sotto carico** | la tensione si legge 20 ms dopo l'avvio della trasmissione, che dura ~46 ms; la lettura con il riferimento interno (5 conversioni dell'ADC) dura circa un millisecondo. Se la trasmissione finisce prima, `vbat_tx_mV` resta vuota |
 | **Comportamento a batterie scariche** | oggi il nodo trasmette finché si spegne; si potrebbe allungare l'intervallo sotto una soglia |
 | **Bridge** | archivio, allarme sul nodo muto (nessun pacchetto per 2-3 intervalli), pacchetti persi, duplicati e riavvii per nodo |
