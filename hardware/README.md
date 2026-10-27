@@ -7,7 +7,7 @@ pubblicarne i sorgenti con la stessa licenza.
 | Scheda | Cartella | Stato |
 |---|---|---|
 | Nodo BME280: RAK3172, BME280, 2 stilo AA | [`nodo-bme280/`](nodo-bme280/) | schema 0.1 (ERC senza errori), circuito stampato da disegnare |
-| Ricevitore sul GPIO del Raspberry Pi | [`ricevitore/`](ricevitore/) | progetto vuoto; collegamenti in [`bridge/README.md`](../bridge/README.md#ricevitore-sul-gpio-invece-che-sullusb) |
+| Ricevitore USB, per PC o Raspberry Pi | [`ricevitore/`](ricevitore/) | schema 0.1 (ERC senza errori, una segnalazione esclusa e motivata), circuito stampato da disegnare |
 | Nodo SHT45 | — | da progettare quando arrivano i componenti |
 
 ## Struttura
@@ -50,9 +50,26 @@ I file sono in formato **KiCad 9** e si aprono anche con le versioni successive.
 
 Da verificare: codice d'ordine della variante RAK3172 con IPEX; tensione al sensore e consumo a riposo del modulo BME280 a 4 pin (quasi sempre ha un regolatore a 3,3 V, che con le batterie sotto 3,3 V lavora in caduta).
 
+## Ricevitore USB, schema 0.1
+
+Una chiavetta che si collega con lo stesso cavo USB al PC o al Raspberry Pi: il sistema la vede come porta seriale, e il bridge funziona com'è.
+
+| Parte | Soluzione |
+|---|---|
+| Connettore | USB-C, solo USB 2.0 (HRO TYPE-C-31-M-12); R1 e R2 da 5,1 kΩ su CC per ricevere i 5 V dall'host |
+| Protezione | USBLC6-2SC6 sulle linee dati |
+| Alimentazione | AP2112K-3.3, da VBUS a 3,3 V per modulo e convertitore |
+| USB-seriale | CH340C alimentato a 3,3 V (V3 su VCC, come da datasheet): la UART ha già i livelli del RAK3172. DTR e RTS non collegati, perché il bridge (pyserial) li attiva aprendo la porta e non deve resettare il modulo |
+| Modulo | RAK3172 con IPEX, antenna su u.FL; seriale su UART2 come ora |
+| Programmazione | dalla stessa USB, come adesso con l'adattatore; se il bootloader non risponde: tenere BOOT, premere e rilasciare RESET; oppure SWD su J2 |
+| LED | D1 alimentazione; D2 su PA8, da far lampeggiare dal firmware del ricevitore a ogni pacchetto |
+
+**Esclusione ERC.** Il pin V3 del CH340C è definito come uscita di alimentazione (è l'uscita del suo regolatore interno); a 3,3 V il datasheet lo vuole collegato a VCC, quindi sulla stessa rete dell'uscita di U3. L'ERC lo segnala come due uscite collegate: la segnalazione è esclusa, con la motivazione, nel `.kicad_pro`. Le altre regole restano attive.
+
+**Sul Raspberry** il CH340 non ha numero di serie: in `/dev/serial/by-id/` comparirà con un nome come `usb-1a86_USB_Serial-if00-port0`, da verificare con `ls /dev/serial/by-id/` e da rimettere nel `config.toml` del bridge al posto di quello dell'adattatore FTDI.
+
 ## Scelte ancora aperte
 
 | Domanda | Possibilità |
 |---|---|
-| Ricevitore | scheda tipo HAT sul connettore a 40 pin del Raspberry, con la breakout RAK3272S su zoccolo; dal Pi solo 3,3 V, GND e il pin 10 (RXD) |
-| Contenitore | misure del contenitore stagno e dello schermo per il sensore: decidono la forma della scheda |
+| Contenitore | misure del contenitore stagno e dello schermo per il sensore: decidono la forma della scheda del nodo |
