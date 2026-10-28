@@ -1,0 +1,8 @@
+(version 1)
+
+# I pulsanti THT hanno quattro piedini: quelli a GND sono collegati al piano
+# inferiore con tutti i raggi; sul lato componenti un raggio basta.
+(rule "pulsanti: un raggio sul lato componenti"
+	(layer "F.Cu")
+	(condition "A.memberOfFootprint('SW*')")
+	(constraint min_resolved_spokes 1))
