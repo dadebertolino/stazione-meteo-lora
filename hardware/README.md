@@ -105,6 +105,18 @@ Una chiavetta che si collega con lo stesso cavo USB al PC o al Raspberry Pi: il 
 - Sotto il RAK3172 ci sono due vie di massa (vicino ai pin 11 e 17): le vie sono coperte dal solder mask su tutti e due i lati, ma se il fondo del modulo ha parti scoperte vanno spostate.
 - Nessun foro di fissaggio: dipende dal contenitore.
 
+## File per la produzione
+
+In ogni cartella delle schede, generati con KiCad 10.0.7 dal `.kicad_pcb` e da rigenerare a ogni modifica:
+
+| File | Contenuto |
+|---|---|
+| `gerber/` e `<scheda>-gerber-0.1.zip` | rame, solder mask e serigrafia dei due lati, pasta superiore, contorno; foratura Excellon in mm, fori metallizzati e no nello stesso file |
+| `<scheda>-bom-jlcpcb.csv` | distinta per il montaggio JLCPCB, solo componenti SMD, con i codici LCSC |
+| `<scheda>-cpl-jlcpcb.csv` | posizioni e rotazioni degli SMD, lato superiore |
+
+I componenti passanti (pulsanti, pin header, portabatterie) restano da saldare a mano. Il RAK3172-8-SM-I (C19723904) a fine ottobre 2026 è esaurito su LCSC: si toglie la riga U1 dalla BOM e lo si salda a mano, o lo si fornisce a JLCPCB. Nell'anteprima di JLCPCB vanno controllate le rotazioni di U2, U3, U4, Q1 e J1. I Gerber del nodo vanno rifatti dopo aver spostato i fori sulle colonnine della scatola.
+
 ## Scelte ancora aperte
 
 | Domanda | Possibilità |
