@@ -1,0 +1,16 @@
+LCSC Part Number,Quantity,Manufacturer Part Number,Description,Designators,Needed 5+5
+C28323,10,CL21B105KBFNNNE,1µF 50V X7R 0805,ricevitore C1,5
+C15850,12,CL21A106KAYNNNE,10µF 25V X5R 0805,ricevitore C2; nodo C1,10
+C49678,30,CC0805KRX7R9BB104,100nF 50V X7R 0805,ricevitore C3-C5; nodo C2-C3,25
+C2297,10,KT-0805G,LED verde 0805,ricevitore D1,5
+C2296,10,KT-0805Y,LED giallo 0805,ricevitore D2,5
+C17414,20,0805W8F1002T5E,10k 1% 0805,ricevitore R3; nodo R1-R2,15
+C17513,12,0805W8F1001T5E,1k 1% 0805,ricevitore R4-R5,10
+C46392,7,921-111A1010D10200,"USB-B femmina 90°, THT",ricevitore J1,5
+C7519,6,USBLC6-2SC6,protezione ESD USB SOT-23-6,ricevitore U2,5
+C51118,6,AP2112K-3.3TRG1,"regolatore 3,3V SOT-23-5",ricevitore U3,5
+C84681,6,CH340C,USB-seriale SOIC-16,ricevitore U4,5
+C150470,6,DMG2305UX-7,P-MOSFET SOT-23,nodo Q1,5
+C393938,16,TS665CJ,pulsante 6x6x5 mm THT,ricevitore SW1-SW2; nodo SW1,15
+C2718488,6,2.54-1*4P,"femmina 1x4 passo 2,54",nodo J1,5
+C2337,5,2.54-1*40P,"pin header maschio 1x40 passo 2,54, da spezzare","ricevitore J2 (4); nodo J2 (6), J3 (4)",2

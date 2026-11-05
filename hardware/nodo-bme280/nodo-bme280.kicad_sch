@@ -6,8 +6,8 @@
 	(paper "A4")
 	(title_block
 		(title "Nodo BME280")
-		(date "2026-10-27")
-		(rev "0.1")
+		(date "2026-10-31")
+		(rev "0.2")
 		(company "Stazione meteo LoRa - IIS Cigna-Baruffi-Garelli")
 		(comment 1 "Nodo esterno: RAK3172, BME280, 2 stilo AA")
 		(comment 2 "Autore: Davide Bertolino")
@@ -2096,7 +2096,165 @@
 		)
 		(embedded_fonts no)
 	)
-(symbol "Connector_Generic:Conn_01x04"
+(symbol "Connector_Generic:Conn_01x02"
+		(pin_names
+			(offset 1.016)
+			(hide yes)
+		)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(in_pos_files yes)
+		(duplicate_pin_numbers_are_jumpers no)
+		(property "Reference" "J"
+			(at 0 2.54 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Value" "Conn_01x02"
+			(at 0 -5.08 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Footprint" ""
+			(at 0 0 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(hide yes)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Datasheet" ""
+			(at 0 0 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(hide yes)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Description" "Generic connector, single row, 01x02, script generated (kicad-library-utils/schlib/autogen/connector/)"
+			(at 0 0 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(hide yes)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "ki_keywords" "connector"
+			(at 0 0 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(hide yes)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "ki_fp_filters" "Connector*:*_1x??_*"
+			(at 0 0 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(hide yes)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(symbol "Conn_01x02_1_1"
+			(rectangle
+				(start -1.27 1.27)
+				(end 1.27 -3.81)
+				(stroke
+					(width 0.254)
+					(type default)
+				)
+				(fill
+					(type background)
+				)
+			)
+			(rectangle
+				(start -1.27 0.127)
+				(end 0 -0.127)
+				(stroke
+					(width 0.1524)
+					(type default)
+				)
+				(fill
+					(type none)
+				)
+			)
+			(rectangle
+				(start -1.27 -2.413)
+				(end 0 -2.667)
+				(stroke
+					(width 0.1524)
+					(type default)
+				)
+				(fill
+					(type none)
+				)
+			)
+			(pin passive line
+				(at -5.08 0 0)
+				(length 3.81)
+				(name "Pin_1"
+					(effects
+						(font
+							(size 1.27 1.27)
+						)
+					)
+				)
+				(number "1"
+					(effects
+						(font
+							(size 1.27 1.27)
+						)
+					)
+				)
+			)
+			(pin passive line
+				(at -5.08 -2.54 0)
+				(length 3.81)
+				(name "Pin_2"
+					(effects
+						(font
+							(size 1.27 1.27)
+						)
+					)
+				)
+				(number "2"
+					(effects
+						(font
+							(size 1.27 1.27)
+						)
+					)
+				)
+			)
+		)
+		(embedded_fonts no)
+	)
+	(symbol "Connector_Generic:Conn_01x04"
 		(pin_names
 			(offset 1.016)
 			(hide yes)
@@ -2765,6 +2923,26 @@
 		(embedded_fonts no)
 	)
 	)
+	(symbol (lib_id "Connector_Generic:Conn_01x02") (at 55.88 50.8 0) (unit 1)
+		(exclude_from_sim no) (in_bom no) (on_board yes) (dnp no)
+		(uuid "07b13970-0fa7-4b74-a922-2b19fa77f788")
+		(property "Reference" "J4" (at 55.88 46.99 0) (effects (font (size 1.27 1.27))))
+		(property "Value" "Portabatterie filato" (at 55.88 57.15 0) (effects (font (size 1.27 1.27))))
+		(property "Footprint" "Connector_Wire:SolderWire-0.25sqmm_1x02_P4.2mm_D0.65mm_OD1.7mm_Relief" (at 55.88 50.8 0) (effects (font (size 1.27 1.27)) (hide yes)))
+		(property "Datasheet" "~" (at 55.88 50.8 0) (effects (font (size 1.27 1.27)) (hide yes)))
+		(pin "1" (uuid "60a18e2e-ae30-46cb-8b5a-b1f38c449446"))
+		(pin "2" (uuid "51dabdc6-88de-4049-a2b9-97828e8ee6e8"))
+		(instances (project "nodo-bme280" (path "/4cd4c707-e6ed-400a-8bd1-749861bc1f66" (reference "J4") (unit 1))))
+	)
+	(wire (pts (xy 50.8 50.8) (xy 48.26 50.8)) (stroke (width 0) (type default)) (uuid "ca021745-0802-47a1-a680-5a50259d2483"))
+	(wire (pts (xy 48.26 50.8) (xy 48.26 43.18)) (stroke (width 0) (type default)) (uuid "6986ca53-f880-4b70-adca-e936ad85ac70"))
+	(wire (pts (xy 48.26 43.18) (xy 38.1 43.18)) (stroke (width 0) (type default)) (uuid "af7457f5-d4ec-4287-849a-b90f8fb8f48b"))
+	(wire (pts (xy 50.8 53.34) (xy 48.26 53.34)) (stroke (width 0) (type default)) (uuid "7e5b26d7-962c-4256-93e4-18cdd707c2aa"))
+	(wire (pts (xy 48.26 53.34) (xy 48.26 58.42)) (stroke (width 0) (type default)) (uuid "37b59577-6b7b-4a4b-9278-edd8707d3b90"))
+	(wire (pts (xy 48.26 58.42) (xy 38.1 58.42)) (stroke (width 0) (type default)) (uuid "150ddbf3-f904-49cb-8d77-e3d6427e1afa"))
+	(junction (at 38.1 43.18) (diameter 0) (color 0 0 0 0) (uuid "a800f017-81d1-4d30-a9f8-f56c96e43e19"))
+	(junction (at 38.1 58.42) (diameter 0) (color 0 0 0 0) (uuid "9ce2b6ab-c0a3-481a-9a7e-b09e0fe94031"))
+	(text "J4: piazzole per un portabatterie 2×AA filato, in alternativa a BT1 (montarne uno solo).\nIl portabatterie filato va al posto di BT1, fissato con una fascetta nelle asole H5 e H6." (exclude_from_sim no) (at 25.4 180.34 0) (effects (font (size 1.27 1.27)) (justify left bottom)) (uuid "f2f91a2d-e300-4415-8f9d-66fd7b1c807b"))
 	(symbol (lib_id "Device:Battery") (at 38.1 50.8 0) (unit 1)
 		(exclude_from_sim no) (in_bom yes) (on_board yes) (dnp no)
 		(uuid "6f5a39e5-5c34-4e84-9dcb-8a7a37d8c284")

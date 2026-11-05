@@ -1,0 +1,8 @@
+(version 1)
+
+# Le piazzole passanti a GND sono collegate al piano inferiore con tutti i
+# raggi; sul lato componenti, dove passano le piste, un raggio basta.
+(rule "passanti: un raggio sul lato componenti"
+	(layer "F.Cu")
+	(condition "A.Pad_Type == 'Through-hole'")
+	(constraint min_resolved_spokes 1))
