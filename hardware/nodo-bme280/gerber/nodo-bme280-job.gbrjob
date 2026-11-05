@@ -5,13 +5,13 @@
       "Application": "Pcbnew",
       "Version": "10.0.7"
     },
-    "CreationDate": "2026-10-28T17:57:25+01:00"
+    "CreationDate": "2026-10-31T10:28:13+01:00"
   },
   "GeneralSpecs": {
     "ProjectId": {
       "Name": "nodo-bme280",
       "GUID": "6e6f646f-2d62-46d6-9532-38302e6b6963",
-      "Revision": "0.1"
+      "Revision": "0.2"
     },
     "Size": {
       "X": 95.1,

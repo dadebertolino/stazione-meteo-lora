@@ -5,13 +5,13 @@
       "Application": "Pcbnew",
       "Version": "10.0.7"
     },
-    "CreationDate": "2026-10-28T17:57:23+01:00"
+    "CreationDate": "2026-10-31T09:24:39+01:00"
   },
   "GeneralSpecs": {
     "ProjectId": {
       "Name": "ricevitore",
       "GUID": "72696365-7669-4746-9f72-652e6b696361",
-      "Revision": "0.1"
+      "Revision": "0.2"
     },
     "Size": {
       "X": 60.1,

@@ -1,0 +1,77 @@
+(footprint "Asola_fascetta_4x1.6mm"
+	(version 20260206)
+	(generator "pcbnew")
+	(generator_version "10.0")
+	(layer "F.Cu")
+	(descr "Asola non metallizzata 4 x 1,6 mm per una fascetta fino a 3,6 mm di larghezza")
+	(tags "fascetta asola cable tie slot")
+	(property "Reference" "REF**"
+		(at 0 -2 0)
+		(layer "F.SilkS")
+		(hide yes)
+		(uuid "7d1f3c2a-5b8e-4a61-9c0d-2e4f6a8b1c01")
+		(effects
+			(font
+				(size 1 1)
+				(thickness 0.15)
+			)
+		)
+	)
+	(property "Value" "Asola_fascetta_4x1.6mm"
+		(at 0 2 0)
+		(layer "F.Fab")
+		(hide yes)
+		(uuid "7d1f3c2a-5b8e-4a61-9c0d-2e4f6a8b1c02")
+		(effects
+			(font
+				(size 1 1)
+				(thickness 0.15)
+			)
+		)
+	)
+	(property "Datasheet" ""
+		(at 0 0 0)
+		(unlocked yes)
+		(layer "F.Fab")
+		(hide yes)
+		(uuid "7d1f3c2a-5b8e-4a61-9c0d-2e4f6a8b1c03")
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+		)
+	)
+	(property "Description" ""
+		(at 0 0 0)
+		(unlocked yes)
+		(layer "F.Fab")
+		(hide yes)
+		(uuid "7d1f3c2a-5b8e-4a61-9c0d-2e4f6a8b1c04")
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+		)
+	)
+	(attr board_only exclude_from_pos_files exclude_from_bom)
+	(duplicate_pad_numbers_are_jumpers no)
+	(fp_rect
+		(start -2.5 -1.05)
+		(end 2.5 1.05)
+		(stroke
+			(width 0.05)
+			(type solid)
+		)
+		(fill no)
+		(layer "F.CrtYd")
+		(uuid "7d1f3c2a-5b8e-4a61-9c0d-2e4f6a8b1c05")
+	)
+	(pad "" np_thru_hole oval
+		(at 0 0)
+		(size 4 1.6)
+		(drill oval 4 1.6)
+		(layers "*.Cu" "*.Mask")
+		(uuid "7d1f3c2a-5b8e-4a61-9c0d-2e4f6a8b1c06")
+	)
+	(embedded_fonts no)
+)

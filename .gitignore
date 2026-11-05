@@ -22,3 +22,6 @@ _autosave-*
 fp-info-cache
 *.bak
 \#auto_saved_files\#
+
+# Cronologia locale di VS Code
+.history/
